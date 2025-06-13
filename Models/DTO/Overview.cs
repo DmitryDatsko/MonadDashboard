@@ -1,4 +1,4 @@
-﻿namespace MonadDashboard.Models.DTO;
+namespace MonadDashboard.Models.DTO;
 
 public class Overview
 {
