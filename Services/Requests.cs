@@ -1,6 +1,7 @@
 ﻿using System.Numerics;
 using Microsoft.Extensions.Options;
 using MonadDashboard.Configuration;
+using MonadDashboard.Models.Responses;
 using Nethereum.Hex.HexTypes;
 using Nethereum.RPC.Eth.DTOs;
 using Nethereum.Web3;
@@ -41,5 +42,10 @@ public class Requests : IRequests
             .OrderBy(b => b.Number.Value).ToList();
 
         return blocks;
+    }
+
+    public Task<IReadOnlyList<DailyNetworkUtilization>> GetDailyNetworkUtilization(int range)
+    {
+        throw new NotImplementedException();
     }
 }
