@@ -1,7 +1,10 @@
 ﻿using System.Dynamic;
+using System.Globalization;
 using System.Numerics;
 using System.Reflection;
 using MonadDashboard.Extensions;
+using Nethereum.Util;
+using Nethereum.Web3;
 using Org.BouncyCastle.Tls.Crypto;
 
 namespace MonadDashboard.Services;
@@ -132,7 +135,19 @@ public class DataProcessor : IDataProcessor
 
         foreach (var prop in props)
         {
-            expando[prop.Name] = prop.GetValue(this)!.ToString()!;
+            var rawValue = prop.GetValue(this);
+
+            expando[prop.Name] = rawValue switch
+            {
+                decimal dec =>
+                    Math.Round(dec, 2, MidpointRounding.AwayFromZero)
+                        .ToString("F2", CultureInfo.InvariantCulture),
+                
+                null => 
+                    string.Empty,
+
+                _ => rawValue.ToString() ?? string.Empty
+            };
         }
         
         return expando;
