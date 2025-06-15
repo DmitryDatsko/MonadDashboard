@@ -10,5 +10,9 @@ public enum Action
     TokenFtTx,
     Token1155Tx,
     GetContractCreation,
-    
+    DailyAvgBlockSize,
+    DailyAvgBlockTime,
+    DailyNetUtilization,
+    DailyTxnFee,
+    DailyTx
 }

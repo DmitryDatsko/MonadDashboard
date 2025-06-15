@@ -8,5 +8,8 @@ public interface IRequests
 {
     Task<BigInteger> GetCurrentBlockAsync();
     Task<IReadOnlyList<BlockWithTransactions>> GetLastBlockWithTransaction(BigInteger blockNumber);
-    Task<IReadOnlyList<DailyNetworkUtilization>> GetDailyNetworkUtilization(int range);
+    Task<IReadOnlyList<DailyNetworkUtilization>?> GetDailyNetworkUtilization(int range);
+    Task<IReadOnlyList<DailyTransactionFee>?> GetDailyNetworkTransactionFee(int range);
+    Task<IReadOnlyList<DailyTransactionCount>?> GetDailyTransactionCount(int range);
+    
 }

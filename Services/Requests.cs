@@ -1,10 +1,14 @@
 ﻿using System.Numerics;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 using Microsoft.Extensions.Options;
 using MonadDashboard.Configuration;
 using MonadDashboard.Models.Responses;
 using Nethereum.Hex.HexTypes;
 using Nethereum.RPC.Eth.DTOs;
 using Nethereum.Web3;
+using Action = MonadDashboard.Models.SocialScan.Action;
+using Module = MonadDashboard.Models.SocialScan.Module;
 
 namespace MonadDashboard.Services;
 
@@ -12,12 +16,19 @@ public class Requests : IRequests
 {
     private readonly Web3 _hypersyncRpc;
     private readonly int _batchSize;
-
-    public Requests(IOptions<EnvVariables> env)
+    private readonly SocialScanProvider _socialScanProvider;
+    private readonly HttpClient _httpClient;
+    private readonly ILogger<Requests> _logger;
+    public Requests(IOptions<EnvVariables> env,
+        ILogger<Requests> logger)
     {
         _hypersyncRpc = new Web3(env.Value.HyperSyncRpc);
         _batchSize = env.Value.BatchSize;
-        Console.WriteLine(_batchSize);
+        _socialScanProvider = new SocialScanProvider
+        (baseUrl: env.Value.SocialScanApi,
+            apiKey: env.Value.SocialScanPublicApiKey);
+        _httpClient = new HttpClient();
+        _logger = logger;
     }
     
     public async Task<BigInteger> GetCurrentBlockAsync()
@@ -44,8 +55,54 @@ public class Requests : IRequests
         return blocks;
     }
 
-    public Task<IReadOnlyList<DailyNetworkUtilization>> GetDailyNetworkUtilization(int range)
+    public async Task<IReadOnlyList<DailyNetworkUtilization>?> GetDailyNetworkUtilization(int range)
     {
-        throw new NotImplementedException();
+        var uri = _socialScanProvider
+            .WithModule(Module.Stats)
+            .WithAction(Action.DailyNetUtilization)
+            .WithStartDate(DateTime.UtcNow.AddDays(-range))
+            .WithEndDate(DateTime.UtcNow)
+            .Build();
+
+        var response = await _httpClient.GetFromJsonAsync<SocialScanResponse<List<DailyNetworkUtilization>>>(uri);
+        
+        if(response == null || response.Status != "1")
+            return null;
+        
+        return response.Result;
+    }
+
+    public async Task<IReadOnlyList<DailyTransactionFee>?> GetDailyNetworkTransactionFee(int range)
+    {
+        var uri = _socialScanProvider
+            .WithModule(Module.Stats)
+            .WithAction(Action.DailyTxnFee)
+            .WithStartDate(DateTime.UtcNow.AddDays(-range))
+            .WithEndDate(DateTime.UtcNow)
+            .Build();
+
+        var response = await _httpClient.GetFromJsonAsync<SocialScanResponse<List<DailyTransactionFee>>>(uri);
+        
+        if(response == null || response.Status != "1")
+            return null;
+        
+        return response.Result;
+    }
+    
+    public async Task<IReadOnlyList<DailyTransactionCount>?> GetDailyTransactionCount(int range)
+    {
+        var uri = _socialScanProvider
+            .WithModule(Module.Stats)
+            .WithAction(Action.DailyTx)
+            .WithStartDate(DateTime.UtcNow.AddDays(-range))
+            .WithEndDate(DateTime.UtcNow)
+            .Build();
+
+        var response = await _httpClient.GetFromJsonAsync<SocialScanResponse<List<DailyTransactionCount>>>(uri);
+        
+        if(response == null || response.Status != "1")
+            return null;
+        
+        return response.Result;
     }
 }

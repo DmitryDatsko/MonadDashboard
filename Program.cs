@@ -34,6 +34,9 @@ var app = builder.Build();
 app.UseHttpsRedirection();
 app.UseCors(myAllowSpecificOrigins);
 
+app.UseSwagger();
+app.UseSwaggerUI();
+
 app.MapControllers();
 app.MapHub<DashboardHub>("/dashboard");
 
