@@ -1,4 +1,5 @@
 ﻿using System.Numerics;
+using MonadDashboard.Models;
 
 namespace MonadDashboard.Services;
 
@@ -9,12 +10,14 @@ public interface IDataProcessor
     decimal AvgBlockTime { get; }
     BigInteger AvgFeeWei { get; }
     BigInteger AvgGasWei { get; }
+    TotalTransaction TotalTransaction { get; }
 
     Task UpdateLatestBlockAsync();
     Task UpdateAvgTpsAsync();
     Task UpdateAvgBlockTime();
     Task UpdateAvgFeeWei();
     Task UpdateAvgGasWei();
+    Task UpdateTotalTransaction();
     
     Task UpdateDataAsync();
     dynamic GetMetrics();

@@ -28,7 +28,7 @@ public class DataUpdateService : BackgroundService
                 metrics
             }, stoppingToken);
 
-            await Task.Delay(200, stoppingToken);
+            await Task.Delay(500, stoppingToken);
         }
     }
 }

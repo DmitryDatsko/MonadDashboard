@@ -9,16 +9,21 @@ namespace MonadDashboard.Controllers;
 public class ChartController : ControllerBase
 {
     private readonly IRequests _requests;
+    private readonly IDataProcessor _dataProcessor;
 
-    public ChartController(IRequests requests)
+    public ChartController(IRequests requests,
+        IDataProcessor dataProcessor)
     {
         _requests = requests;
+        _dataProcessor = dataProcessor;
     }
 
     [HttpGet("daily-network-utilization")]
     public async Task<IActionResult> DailyNetworkUtilization([FromQuery] int range = 7)
     {
         var response = await _requests.GetDailyNetworkUtilization(range);
+
+        await _dataProcessor.UpdateTotalTransaction();
         
         return Ok(response);
     }

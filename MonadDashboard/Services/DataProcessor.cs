@@ -3,9 +3,7 @@ using System.Globalization;
 using System.Numerics;
 using System.Reflection;
 using MonadDashboard.Extensions;
-using Nethereum.Util;
-using Nethereum.Web3;
-using Org.BouncyCastle.Tls.Crypto;
+using MonadDashboard.Models;
 
 namespace MonadDashboard.Services;
 
@@ -18,17 +16,21 @@ public class DataProcessor : IDataProcessor
     public decimal AvgBlockTime { get; private set; }
     public BigInteger AvgFeeWei { get; private set; }
     public BigInteger AvgGasWei { get; private set; }
+    public TotalTransaction TotalTransaction { get; private set; }
 
     public DataProcessor(IRequests requests,
         ILogger<DataProcessor> logger)
     {
         _requests = requests;
         _logger = logger;
+        TotalTransaction = new TotalTransaction();
     }
     
     public async Task UpdateLatestBlockAsync()
     {
         LatestBlock = await _requests.GetCurrentBlockAsync();
+
+        var d = await _requests.GetDaysAfterCreating();
     }
 
     public async Task UpdateAvgTpsAsync()
@@ -98,6 +100,25 @@ public class DataProcessor : IDataProcessor
         
         AvgGasWei = gases.Sum() / gases.Count;
     }
+    
+    public async Task UpdateTotalTransaction()
+    {
+        if (TotalTransaction.TransactionsAmount == 0)
+        {
+            var range = await _requests.GetDaysAfterCreating();
+            var txs = await _requests.GetDailyTransactionCount(range);
+
+            if (txs == null)
+                return;
+            
+            var dude = await _requests.GetBlockByTimestamp(txs[^1].UtcDate);
+
+            TotalTransaction.TransactionsAmount = (ulong)txs.Select(tx => tx.TransactionCount).Sum()!;
+            
+            Console.WriteLine($"Latest block from api: {dude}");
+            Console.WriteLine($"Total: {TotalTransaction.TransactionsAmount}");
+        }
+    }
 
     public async Task UpdateDataAsync()
     {
@@ -105,7 +126,8 @@ public class DataProcessor : IDataProcessor
             .GetMethods(BindingFlags.Instance | BindingFlags.Public)
             .Where(m => 
                 m.Name.StartsWith("Update", StringComparison.Ordinal)
-                && m.Name != nameof(UpdateDataAsync))
+                && m.Name != nameof(UpdateDataAsync)
+                && m.Name != nameof(UpdateTotalTransaction))
             .OrderBy(m => m.Name != nameof(UpdateLatestBlockAsync))
             .ThenBy(m => m.Name);
 
@@ -124,7 +146,7 @@ public class DataProcessor : IDataProcessor
 
         await Task.WhenAll(tasks);
     }
-
+    
     public dynamic GetMetrics()
     {
         var expando = new ExpandoObject() as IDictionary<string, object>;

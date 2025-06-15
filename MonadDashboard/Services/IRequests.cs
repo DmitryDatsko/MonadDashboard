@@ -11,5 +11,6 @@ public interface IRequests
     Task<IReadOnlyList<DailyNetworkUtilization>?> GetDailyNetworkUtilization(int range);
     Task<IReadOnlyList<DailyTransactionFee>?> GetDailyNetworkTransactionFee(int range);
     Task<IReadOnlyList<DailyTransactionCount>?> GetDailyTransactionCount(int range);
-    
+    Task<int> GetDaysAfterCreating();
+    Task<long> GetBlockByTimestamp(DateTime? time);
 }
