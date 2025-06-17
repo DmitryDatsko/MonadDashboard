@@ -24,7 +24,7 @@ builder.Services.AddCors(options =>
     options.AddPolicy(name: myAllowSpecificOrigins,
         policyBuilder =>
         {
-            policyBuilder.WithOrigins("http://localhost:5173")
+            policyBuilder.WithOrigins("https://monad-dashboard.duckdns.org/")
                 .AllowAnyHeader()
                 .AllowAnyMethod()
                 .AllowCredentials();
