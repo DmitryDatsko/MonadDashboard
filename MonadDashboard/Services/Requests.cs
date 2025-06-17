@@ -76,6 +76,9 @@ public class Requests : IRequests
         {
             return cached;
         }
+
+        if (range <= 0)
+            range = await GetDaysAfterCreatingAsync();
         
         var uri = _socialScanProvider
             .WithModule(Module.Stats)
@@ -111,6 +114,9 @@ public class Requests : IRequests
             return cached;
         }
         
+        if (range <= 0)
+            range = await GetDaysAfterCreatingAsync();
+        
         var uri = _socialScanProvider
             .WithModule(Module.Stats)
             .WithAction(Action.DailyTxnFee)
@@ -144,6 +150,9 @@ public class Requests : IRequests
         {
             return cached;
         }
+        
+        if (range <= 0)
+            range = await GetDaysAfterCreatingAsync();
         
         var uri = _socialScanProvider
             .WithModule(Module.Stats)
@@ -342,9 +351,22 @@ public class Requests : IRequests
             .Select(tx => tx.TransactionHash.ToString())
             .ToArray();
         
-        var receipt = await _hypersyncRpc.Eth.Transactions
-            .GetTransactionReceipt
-            .SendBatchRequestAsync(transactionHashes);
+        var receipt = new List<TransactionReceipt>();
+
+        for (int i = 0; i < transactionHashes.Length; i += _batchSize)
+        {
+            var txHashSelection = transactionHashes
+                .Skip(i)
+                .Take(_batchSize)
+                .ToArray();
+            
+            var tmp = await _hypersyncRpc.Eth.Transactions
+                .GetTransactionReceipt
+                .SendBatchRequestAsync(txHashSelection);
+            
+            receipt.AddRange(tmp);
+            await Task.Delay(20);
+        }
 
         return receipt;
     }
