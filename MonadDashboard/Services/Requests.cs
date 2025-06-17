@@ -332,6 +332,23 @@ public class Requests : IRequests
         return diff.Days + 1;
     }
 
+    public async Task<IReadOnlyList<TransactionReceipt>> GetBlockTransactionsReceiptsAsync(BigInteger blockNumber)
+    {
+        var block = await _hypersyncRpc.Eth.Blocks
+            .GetBlockWithTransactionsByNumber
+            .SendRequestAsync(new HexBigInteger(blockNumber));
+        
+        var transactionHashes = block.Transactions
+            .Select(tx => tx.TransactionHash.ToString())
+            .ToArray();
+        
+        var receipt = await _hypersyncRpc.Eth.Transactions
+            .GetTransactionReceipt
+            .SendBatchRequestAsync(transactionHashes);
+
+        return receipt;
+    }
+
     public async Task<long> GetBlockByTimestampAsync(DateTime? time)
     {
         var latestNumber = await _hypersyncRpc.Eth.Blocks

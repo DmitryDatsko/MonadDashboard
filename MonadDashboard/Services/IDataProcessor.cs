@@ -11,6 +11,7 @@ public interface IDataProcessor
     BigInteger AvgFeeWei { get; }
     BigInteger AvgGasWei { get; }
     TotalTransaction TotalTransaction { get; }
+    double SuccessPct { get; }
 
     Task UpdateLatestBlockAsync();
     Task UpdateAvgTpsAsync();
@@ -19,6 +20,7 @@ public interface IDataProcessor
     Task UpdateAvgGasWeiAsync();
     Task UpdateTotalTransactionAsync();
     Task UpdateRemainingTransactionsAsync();
+    Task UpdateSuccessPct();
     
     Task UpdateDataAsync();
     dynamic GetMetrics();

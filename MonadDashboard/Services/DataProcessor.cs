@@ -23,6 +23,7 @@ public class DataProcessor : IDataProcessor
     public BigInteger AvgFeeWei { get; private set; }
     public BigInteger AvgGasWei { get; private set; }
     public TotalTransaction TotalTransaction { get; private set; }
+    public double SuccessPct { get; private set; }
 
     public DataProcessor(IRequests requests,
         ILogger<DataProcessor> logger)
@@ -156,6 +157,19 @@ public class DataProcessor : IDataProcessor
         }
     }
 
+    public async Task UpdateSuccessPct()
+    {
+        var receipts = await _requests.GetBlockTransactionsReceiptsAsync(LatestBlock);
+        
+        int totalTx = receipts.Count;
+        int successTx = receipts.Count(r => r.Status.Value == 1);
+        double successPct = totalTx == 0
+            ? 0
+            : successTx * 100.0 / totalTx;
+        
+        SuccessPct = successPct;
+    }
+
     public async Task UpdateDataAsync()
     {
         lock (_lock)
@@ -217,6 +231,10 @@ public class DataProcessor : IDataProcessor
             {
                 decimal dec =>
                     Math.Round(dec, 2, MidpointRounding.AwayFromZero)
+                        .ToString("F2", CultureInfo.InvariantCulture),
+                
+                double dou =>
+                    Math.Round(dou, 2, MidpointRounding.AwayFromZero)
                         .ToString("F2", CultureInfo.InvariantCulture),
                 
                 TotalTransaction totalTx =>
