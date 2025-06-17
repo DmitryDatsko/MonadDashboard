@@ -2,6 +2,6 @@
 
 public class TotalTransaction
 {
-    public ulong LastestBlock { get; set; }
-    public ulong TransactionsAmount { get; set; }
+    public long LastestBlock { get; set; }
+    public long? TransactionsAmount { get; set; }
 }

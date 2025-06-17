@@ -1,16 +1,21 @@
 ﻿using System.Numerics;
 using MonadDashboard.Models.Responses;
 using Nethereum.RPC.Eth.DTOs;
+using Block = MonadDashboard.Models.Responses.Block;
+using Transaction = MonadDashboard.Models.Responses.Transaction;
 
 namespace MonadDashboard.Services;
 
 public interface IRequests
 {
-    Task<BigInteger> GetCurrentBlockAsync();
-    Task<IReadOnlyList<BlockWithTransactions>> GetLastBlockWithTransaction(BigInteger blockNumber);
-    Task<IReadOnlyList<DailyNetworkUtilization>?> GetDailyNetworkUtilization(int range);
-    Task<IReadOnlyList<DailyTransactionFee>?> GetDailyNetworkTransactionFee(int range);
-    Task<IReadOnlyList<DailyTransactionCount>?> GetDailyTransactionCount(int range);
-    Task<int> GetDaysAfterCreating();
-    Task<long> GetBlockByTimestamp(DateTime? time);
+    Task<long> GetCurrentBlockAsync();
+    Task<IReadOnlyList<BlockWithTransactions>> GetLastBlockWithTransactionAsync(BigInteger blockNumber);
+    Task<IReadOnlyList<DailyNetworkUtilization>?> GetDailyNetworkUtilizationAsync(int range);
+    Task<IReadOnlyList<DailyTransactionFee>?> GetDailyNetworkTransactionFeeAsync(int range);
+    Task<IReadOnlyList<DailyTransactionCount>?> GetDailyTransactionCountAsync(int range);
+    Task<HypersyncTransaction> HypersyncTransactionAsync(long start, long end);
+    Task<IReadOnlyList<Transaction>> GetLatestBlockTransaction(int page, int pageSize = 20);
+    Task<IReadOnlyList<Block>> GetLatestBlockData();
+    Task<int> GetDaysAfterCreatingAsync();
+    Task<long> GetBlockByTimestampAsync(DateTime? time);
 }

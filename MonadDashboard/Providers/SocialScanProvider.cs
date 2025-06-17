@@ -2,7 +2,7 @@
 using MonadDashboard.Models.SocialScan;
 using Action = MonadDashboard.Models.SocialScan.Action;
 
-namespace MonadDashboard.Services;
+namespace MonadDashboard.Providers;
 
 public class SocialScanProvider
 {
@@ -18,6 +18,7 @@ public class SocialScanProvider
         foreach (var key in keysToRemove)
             _parameters.Remove(key);
     }
+    
     public SocialScanProvider(string baseUrl, string apiKey)
     {
         _baseUrl = baseUrl;

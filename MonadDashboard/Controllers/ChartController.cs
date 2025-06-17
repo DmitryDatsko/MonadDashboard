@@ -1,5 +1,4 @@
-﻿using System.Numerics;
-using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Mvc;
 using MonadDashboard.Services;
 
 namespace MonadDashboard.Controllers;
@@ -9,21 +8,16 @@ namespace MonadDashboard.Controllers;
 public class ChartController : ControllerBase
 {
     private readonly IRequests _requests;
-    private readonly IDataProcessor _dataProcessor;
-
-    public ChartController(IRequests requests,
-        IDataProcessor dataProcessor)
+    
+    public ChartController(IRequests requests)
     {
         _requests = requests;
-        _dataProcessor = dataProcessor;
     }
 
     [HttpGet("daily-network-utilization")]
     public async Task<IActionResult> DailyNetworkUtilization([FromQuery] int range = 7)
     {
-        var response = await _requests.GetDailyNetworkUtilization(range);
-
-        await _dataProcessor.UpdateTotalTransaction();
+        var response = await _requests.GetDailyNetworkUtilizationAsync(range);
         
         return Ok(response);
     }
@@ -31,7 +25,7 @@ public class ChartController : ControllerBase
     [HttpGet("daily-network-transaction-fee")]
     public async Task<IActionResult> DailyNetworkTransactionFee([FromQuery] int range = 7)
     {
-        var response = await _requests.GetDailyNetworkTransactionFee(range);
+        var response = await _requests.GetDailyNetworkTransactionFeeAsync(range);
         
         return Ok(response);
     }
@@ -39,7 +33,7 @@ public class ChartController : ControllerBase
     [HttpGet("daily-transaction-count")]
     public async Task<IActionResult> DailyTransactionCount([FromQuery] int range = 7)
     {
-        var response = await _requests.GetDailyTransactionCount(range);
+        var response = await _requests.GetDailyTransactionCountAsync(range);
         
         return Ok(response);
     }

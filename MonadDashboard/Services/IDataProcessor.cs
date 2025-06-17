@@ -5,7 +5,7 @@ namespace MonadDashboard.Services;
 
 public interface IDataProcessor
 {
-    BigInteger LatestBlock { get; }
+    long LatestBlock { get; }
     decimal AvgTps { get; }
     decimal AvgBlockTime { get; }
     BigInteger AvgFeeWei { get; }
@@ -14,10 +14,11 @@ public interface IDataProcessor
 
     Task UpdateLatestBlockAsync();
     Task UpdateAvgTpsAsync();
-    Task UpdateAvgBlockTime();
-    Task UpdateAvgFeeWei();
-    Task UpdateAvgGasWei();
-    Task UpdateTotalTransaction();
+    Task UpdateAvgBlockTimeAsync();
+    Task UpdateAvgFeeWeiAsync();
+    Task UpdateAvgGasWeiAsync();
+    Task UpdateTotalTransactionAsync();
+    Task UpdateRemainingTransactionsAsync();
     
     Task UpdateDataAsync();
     dynamic GetMetrics();

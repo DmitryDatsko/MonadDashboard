@@ -2,6 +2,7 @@
 using System.Globalization;
 using System.Numerics;
 using System.Reflection;
+using System.Runtime.InteropServices.ComTypes;
 using MonadDashboard.Extensions;
 using MonadDashboard.Models;
 
@@ -11,7 +12,12 @@ public class DataProcessor : IDataProcessor
 {
     private readonly IRequests _requests;
     private readonly ILogger<DataProcessor> _logger;
-    public BigInteger LatestBlock { get; private set; }
+    private static readonly int ChunkSize = 5000;
+    
+    private Task? _longRunningTask;
+    private readonly object _lock = new();
+    
+    public long LatestBlock { get; private set; }
     public decimal AvgTps { get; private set; }
     public decimal AvgBlockTime { get; private set; }
     public BigInteger AvgFeeWei { get; private set; }
@@ -23,19 +29,21 @@ public class DataProcessor : IDataProcessor
     {
         _requests = requests;
         _logger = logger;
-        TotalTransaction = new TotalTransaction();
+        TotalTransaction = new TotalTransaction
+        {
+            LastestBlock = 0,
+            TransactionsAmount = 0
+        };
     }
     
     public async Task UpdateLatestBlockAsync()
     {
         LatestBlock = await _requests.GetCurrentBlockAsync();
-
-        var d = await _requests.GetDaysAfterCreating();
     }
 
     public async Task UpdateAvgTpsAsync()
     {
-        var blocks = await _requests.GetLastBlockWithTransaction(LatestBlock);
+        var blocks = await _requests.GetLastBlockWithTransactionAsync(LatestBlock);
         
         if(blocks.Count < 2)
             return;
@@ -47,9 +55,9 @@ public class DataProcessor : IDataProcessor
         AvgTps = Math.Round(totalTx / totalSec, 2);
     }
 
-    public async Task UpdateAvgBlockTime()
+    public async Task UpdateAvgBlockTimeAsync()
     {
-        var blocks = await _requests.GetLastBlockWithTransaction(LatestBlock);
+        var blocks = await _requests.GetLastBlockWithTransactionAsync(LatestBlock);
 
         var times = blocks
             .Select(b => DateTimeOffset
@@ -71,9 +79,9 @@ public class DataProcessor : IDataProcessor
         AvgBlockTime = (decimal)avgSpan.TotalSeconds;
     }
 
-    public async Task UpdateAvgFeeWei()
+    public async Task UpdateAvgFeeWeiAsync()
     {
-        var blocks = await _requests.GetLastBlockWithTransaction(LatestBlock);
+        var blocks = await _requests.GetLastBlockWithTransactionAsync(LatestBlock);
 
         var fees = blocks
             .SelectMany(tx => tx.Transactions)
@@ -86,9 +94,9 @@ public class DataProcessor : IDataProcessor
         AvgFeeWei = fees.Sum() / fees.Count;
     }
 
-    public async Task UpdateAvgGasWei()
+    public async Task UpdateAvgGasWeiAsync()
     {
-        var blocks = await _requests.GetLastBlockWithTransaction(LatestBlock);
+        var blocks = await _requests.GetLastBlockWithTransactionAsync(LatestBlock);
 
         var gases = blocks
             .SelectMany(tx => tx.Transactions)
@@ -101,33 +109,79 @@ public class DataProcessor : IDataProcessor
         AvgGasWei = gases.Sum() / gases.Count;
     }
     
-    public async Task UpdateTotalTransaction()
+    public async Task UpdateTotalTransactionAsync()
     {
         if (TotalTransaction.TransactionsAmount == 0)
         {
-            var range = await _requests.GetDaysAfterCreating();
-            var txs = await _requests.GetDailyTransactionCount(range);
-
+            var range = await _requests.GetDaysAfterCreatingAsync();
+            var txs = await _requests.GetDailyTransactionCountAsync(range);
+            
             if (txs == null)
                 return;
-            
-            var dude = await _requests.GetBlockByTimestamp(txs[^1].UtcDate);
 
-            TotalTransaction.TransactionsAmount = (ulong)txs.Select(tx => tx.TransactionCount).Sum()!;
-            
-            Console.WriteLine($"Latest block from api: {dude}");
-            Console.WriteLine($"Total: {TotalTransaction.TransactionsAmount}");
+            TotalTransaction.LastestBlock = await _requests.GetBlockByTimestampAsync(txs[^1].UtcDate);
+            TotalTransaction.TransactionsAmount = txs.Select(tx => tx.TransactionCount).Sum();
+        }
+    }
+
+    public async Task UpdateRemainingTransactionsAsync()
+    {
+        if (LatestBlock > TotalTransaction.LastestBlock 
+            && TotalTransaction.LastestBlock > 0)
+        {
+            long start = TotalTransaction.LastestBlock + 1;
+            long end = LatestBlock;
+
+            try
+            {
+                for (long chunkStart = start; chunkStart <= end; chunkStart += ChunkSize)
+                {
+                    long chunkEnd = Math.Min(chunkStart + ChunkSize - 1, end);
+
+                    var resp = await _requests
+                        .HypersyncTransactionAsync(chunkStart, chunkEnd);
+
+                    TotalTransaction.LastestBlock = chunkEnd;
+                    TotalTransaction.TransactionsAmount += resp.Transactions;
+                    
+                    _logger.LogInformation($"Transaction added: {resp.Transactions}");
+                    
+                    await Task.Delay(25);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to compute remaining transactions");
+            }
         }
     }
 
     public async Task UpdateDataAsync()
     {
+        lock (_lock)
+        {
+            if (_longRunningTask == null || _longRunningTask.IsCompleted)
+            {
+                _longRunningTask = Task.Run(async () =>
+                {
+                    try
+                    {
+                        await UpdateRemainingTransactionsAsync();
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError(ex, "Long-running update failed");
+                    }
+                });
+            }
+        }
+        
         var updateMethods = this.GetType()
             .GetMethods(BindingFlags.Instance | BindingFlags.Public)
             .Where(m => 
                 m.Name.StartsWith("Update", StringComparison.Ordinal)
                 && m.Name != nameof(UpdateDataAsync)
-                && m.Name != nameof(UpdateTotalTransaction))
+                && m.Name != nameof(UpdateRemainingTransactionsAsync))
             .OrderBy(m => m.Name != nameof(UpdateLatestBlockAsync))
             .ThenBy(m => m.Name);
 
@@ -164,6 +218,9 @@ public class DataProcessor : IDataProcessor
                 decimal dec =>
                     Math.Round(dec, 2, MidpointRounding.AwayFromZero)
                         .ToString("F2", CultureInfo.InvariantCulture),
+                
+                TotalTransaction totalTx =>
+                    totalTx.TransactionsAmount.ToString() ?? string.Empty,
                 
                 null => 
                     string.Empty,

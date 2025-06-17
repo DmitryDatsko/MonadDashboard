@@ -10,6 +10,7 @@ builder.Services.AddControllers();
 builder.Services.AddSignalR();
 builder.Services.AddSwaggerGen();
 builder.Services.AddEndpointsApiExplorer();
+builder.Services.AddMemoryCache();
 
 builder.Services.Configure<EnvVariables>(
     builder.Configuration.GetSection(nameof(EnvVariables)));
