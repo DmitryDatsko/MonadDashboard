@@ -1,19 +1,73 @@
+configs:
+  default_nginx_conf:
+    file: ../nginx/nginx.conf
+
 services:
   tx-counter:
-    build: 
-      context: ./HyperSync
-      dockerfile: Dockerfile
+    image: monad-dashboard-tx-counter
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: on-failure
     ports:
       - "8000:80"
-    restart: always
+    networks:
+      - monad_dashboard_net
   
   backend:
-    build: 
-      context: ./MonadDashboard
-      dockerfile: Dockerfile
+    image: monad-dashboard-backend
     ports:
       - "8080:8080"
       - "8081:8081"
-    restart: always
-    depends_on:
-      - tx-counter
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+    networks:
+      - monad_dashboard_net
+
+  frontend:
+    image: monad-dashboard-frontend
+    ports:
+      - "3000:3000"
+    networks:
+      - monad_dashboard_net
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+    
+  nginx:
+    image: nginx:stable-alpine
+    ports:
+      - "80:80"
+      - "443:443"
+    configs:
+      - source: default_nginx_conf
+        target: /etc/nginx/nginx.conf
+    networks:
+      - monad_dashboard_net
+    secrets:
+      - dashboard_ssl_fullchain
+      - dashboard_ssl_privkey
+      - ssl_options
+      - ssl_dhparams
+    deploy:
+      restart_policy:
+        condition: on-failure
+        delay: 10s
+        max_attempts: 5
+
+secrets:
+  dashboard_ssl_fullchain:
+    external: true
+  dashboard_ssl_privkey:
+    external: true
+  ssl_options:
+    external: true
+  ssl_dhparams:
+    external: true
+
+networks:
+  monad_dashboard_net:
+    driver: overlay
