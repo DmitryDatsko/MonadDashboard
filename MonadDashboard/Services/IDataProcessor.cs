@@ -12,6 +12,7 @@ public interface IDataProcessor
     BigInteger AvgGasWei { get; }
     TotalTransaction TotalTransaction { get; }
     double SuccessPct { get; }
+    long Erc20TransferEvents { get; }
 
     Task UpdateLatestBlockAsync();
     Task UpdateAvgTpsAsync();
@@ -21,7 +22,8 @@ public interface IDataProcessor
     Task UpdateTotalTransactionAsync();
     Task UpdateRemainingTransactionsAsync();
     Task UpdateSuccessPct();
-    
+    Task UpdateErc20TransferEventsAsync();
+        
     Task UpdateDataAsync();
     dynamic GetMetrics();
 }

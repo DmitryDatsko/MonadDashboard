@@ -26,6 +26,9 @@ public class Requests : IRequests
     private static readonly TimeSpan CacheDuration = TimeSpan.FromMinutes(10);
     private static readonly string TransactionCache = nameof(TransactionCache);
     private static readonly string BlockCache = nameof(BlockCache);
+
+    private static readonly string TransferEventTopic =
+        "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef";
     public Requests(IOptions<EnvVariables> env,
         ILogger<Requests> logger,
         IMemoryCache cache)
@@ -369,6 +372,39 @@ public class Requests : IRequests
         }
 
         return receipt;
+    }
+
+    public async Task<IReadOnlyList<FilterLog>> GetTransferLogsAsync(BigInteger blockNumber)
+    {
+        var cacheKey = nameof(GetTransferLogsAsync);
+
+        if (_cache.TryGetValue(cacheKey, out List<FilterLog>? logs)
+            && logs != null)
+        {
+            return logs;
+        }
+        
+        var filterInput = new NewFilterInput
+        {
+            FromBlock = new BlockParameter(new HexBigInteger(blockNumber - 1000)),
+            ToBlock = new BlockParameter(new HexBigInteger(blockNumber)),
+            Topics = [TransferEventTopic]
+        };
+        
+        var response = await _hypersyncRpc.Eth.Filters
+            .GetLogs.SendRequestAsync(filterInput);
+
+        _cache.Set(
+            cacheKey,
+            response,
+            new MemoryCacheEntryOptions
+            {
+                AbsoluteExpirationRelativeToNow = TimeSpan.FromSeconds(50),
+                SlidingExpiration = TimeSpan.FromSeconds(35),
+                Priority = CacheItemPriority.Normal
+            });
+        
+        return response.ToList();
     }
 
     public async Task<long> GetBlockByTimestampAsync(DateTime? time)

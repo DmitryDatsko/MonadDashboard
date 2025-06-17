@@ -18,5 +18,6 @@ public interface IRequests
     Task<IReadOnlyList<Block>> GetLatestBlockData(int page, int pageSize = 20);
     Task<int> GetDaysAfterCreatingAsync();
     Task<IReadOnlyList<TransactionReceipt>> GetBlockTransactionsReceiptsAsync(BigInteger blockNumber);
+    Task<IReadOnlyList<FilterLog>> GetTransferLogsAsync(BigInteger blockNumber);
     Task<long> GetBlockByTimestampAsync(DateTime? time);
 }

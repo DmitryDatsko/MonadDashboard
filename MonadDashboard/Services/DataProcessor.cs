@@ -24,6 +24,7 @@ public class DataProcessor : IDataProcessor
     public BigInteger AvgGasWei { get; private set; }
     public TotalTransaction TotalTransaction { get; private set; }
     public double SuccessPct { get; private set; }
+    public long Erc20TransferEvents { get; private set; }
 
     public DataProcessor(IRequests requests,
         ILogger<DataProcessor> logger)
@@ -160,7 +161,7 @@ public class DataProcessor : IDataProcessor
     public async Task UpdateSuccessPct()
     {
         var receipts = await _requests.GetBlockTransactionsReceiptsAsync(LatestBlock);
-        
+
         int totalTx = receipts.Count;
         int successTx = receipts.Count(r => r.Status.Value == 1);
         double successPct = totalTx == 0
@@ -168,6 +169,13 @@ public class DataProcessor : IDataProcessor
             : successTx * 100.0 / totalTx;
         
         SuccessPct = successPct;
+    }
+
+    public async Task UpdateErc20TransferEventsAsync()
+    {
+        var response = await _requests.GetTransferLogsAsync(LatestBlock);
+
+        Erc20TransferEvents = response.Count;
     }
 
     public async Task UpdateDataAsync()
