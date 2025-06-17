@@ -19,6 +19,10 @@ public class TransactionController : ControllerBase
     {
         var response = await _requests.GetLatestBlockTransaction(page, pageSize);
         
-        return Ok(response);
+        return Ok(new
+        {
+            response,
+            hasMore = response.Count == pageSize
+        });
     }
 }

@@ -24,6 +24,8 @@ public class Requests : IRequests
     private readonly ILogger<Requests> _logger;
     private readonly IMemoryCache _cache;
     private static readonly TimeSpan CacheDuration = TimeSpan.FromMinutes(10);
+    private static readonly string TransactionCache = nameof(TransactionCache);
+    private static readonly string BlockCache = nameof(BlockCache);
     public Requests(IOptions<EnvVariables> env,
         ILogger<Requests> logger,
         IMemoryCache cache)
@@ -182,114 +184,138 @@ public class Requests : IRequests
 
     public async Task<IReadOnlyList<Transaction>> GetLatestBlockTransaction(int page, int pageSize = 20)
     {
-        var cacheKey = $"{nameof(GetLatestBlockTransaction)}";
-
-        if (_cache.TryGetValue(cacheKey, out List<Transaction>? blockData))
+        if (_cache.TryGetValue(TransactionCache, out List<Transaction>? blockData)
+            && blockData != null)
         {
-            _logger.LogCritical("Getting data from cache");
-            return blockData?
-                       .Skip((page -1) * pageSize)
-                       .Take(pageSize * page)
-                       .ToList()
-                ?? Enumerable.Empty<Transaction>().ToList();
+            return blockData
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
+                .ToList();
         }
         
         var latestBlock = await _hypersyncRpc.Eth.Blocks
             .GetBlockNumber.SendRequestAsync();
-
-        BlockWithTransactions data = new();
-        for (int attempt = 1; attempt <= 3; attempt++)
-        {
-            try
-            {
-                data = await _hypersyncRpc.Eth
-                    .Blocks.GetBlockWithTransactionsByNumber.SendRequestAsync(latestBlock);
-            }
-            catch (Nethereum.JsonRpc.Client.RpcResponseException ex)
-                when (ex.Message.Contains("greater than latest block"))
-            {
-                if (attempt == 3)
-                    return Enumerable.Empty<Transaction>().ToList();
-                
-                await Task.Delay(20);
-            }
-        }
-
-        var transactions = data.Transactions.Select(tx => new Transaction(
-            TxHash: tx.TransactionHash,
-            From: tx.From,
-            To: tx.To,
-            ValueWei: tx.Value.Value.ToString(),
-            Timestamp: DateTimeOffset
-                .FromUnixTimeSeconds((long)data.Timestamp.Value)
-                .UtcDateTime
-            )).ToList();
-
-        _cache.Set(
-            cacheKey,
-            transactions,
-            new MemoryCacheEntryOptions
-            {
-                AbsoluteExpirationRelativeToNow = TimeSpan.FromSeconds(10),
-                SlidingExpiration = TimeSpan.FromSeconds(5),
-                Priority = CacheItemPriority.High
-            });
         
-        _logger.LogCritical("Getting data from request");
-        return transactions
-            .Skip((page -1) * pageSize)
-            .Take(pageSize * page)
-            .ToList();
-    }
-
-    public async Task<IReadOnlyList<Block>> GetLatestBlockData()
-    {
-        var cacheKey = $"{nameof(GetLatestBlockData)}";
-
-        if (_cache.TryGetValue(cacheKey, out List<Block>? blockData))
-        {
-            _logger.LogCritical("Getting data from cache");
-            return blockData ??  Enumerable.Empty<Block>().ToList();
-        }
-
-        var latestBlock = await _hypersyncRpc.Eth.Blocks
-            .GetBlockNumber.SendRequestAsync();
-        int maxOffset = (int)BigInteger.Min(latestBlock, _batchSize);
+        int maxOffset = (int)BigInteger.Min(latestBlock, _batchSize * 2);
         
         var blockParams = Enumerable
             .Range(0, maxOffset + 1)
             .Select(i => new HexBigInteger(latestBlock.Value - i))
             .ToArray();
 
-        var blockWithTransactions = (await _hypersyncRpc.Eth.Blocks
+        List<BlockWithTransactions> rawData = new();
+
+        for (int i = 0; i < blockParams.Length; i += _batchSize)
+        {
+            var batch = blockParams
+                .Skip(i)
+                .Take(_batchSize)
+                .ToArray();
+            
+            var block = await _hypersyncRpc.Eth.Blocks
                 .GetBlockWithTransactionsByNumber
-                .SendBatchRequestAsync(blockParams))
+                .SendBatchRequestAsync(batch);
+            
+            rawData.AddRange(block);
+            await Task.Delay(20);
+        }
+
+        var response = rawData
+            .SelectMany(block => block.Transactions.Select(tx => 
+                new Transaction(
+                    TxHash:    tx.TransactionHash,
+                    From:      tx.From,
+                    To:        tx.To,
+                    ValueWei:  tx.Value.Value.ToString(),
+                    Timestamp: DateTimeOffset
+                        .FromUnixTimeSeconds((long)block.Timestamp.Value)
+                        .UtcDateTime
+                )
+            ))
             .ToList();
 
-        var blocks = blockWithTransactions.Select(b => new Block(
+        _cache.Set(
+            TransactionCache,
+            response,
+            new MemoryCacheEntryOptions
+            {
+                AbsoluteExpirationRelativeToNow = TimeSpan.FromSeconds(50),
+                SlidingExpiration = TimeSpan.FromSeconds(35),
+                Priority = CacheItemPriority.High
+            });
+        
+        return response
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .ToList();
+    }
+
+    public async Task<IReadOnlyList<Block>> GetLatestBlockData(int page, int pageSize = 20)
+    {
+        if (_cache.TryGetValue(BlockCache, out List<Block>? blockData)
+            && blockData != null)
+        {
+            return blockData
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
+                .ToList();
+        }
+        
+        var latestBlock = await _hypersyncRpc.Eth.Blocks
+            .GetBlockNumber.SendRequestAsync();
+        
+        int maxOffset = (int)BigInteger.Min(latestBlock, _batchSize * 3);
+        
+        var blockParams = Enumerable
+            .Range(0, maxOffset + 1)
+            .Select(i => new HexBigInteger(latestBlock.Value - i))
+            .ToArray();
+
+        List<BlockWithTransactions> rawData = new();
+
+        for (int i = 0; i < blockParams.Length; i += _batchSize)
+        {
+            var batch = blockParams
+                .Skip(i)
+                .Take(_batchSize)
+                .ToArray();
+
+            _logger.LogDebug($"Requesting batch blocks: {batch.Length}");
+            
+            var block = await _hypersyncRpc.Eth.Blocks
+                .GetBlockWithTransactionsByNumber
+                .SendBatchRequestAsync(batch);
+            
+            rawData.AddRange(block);
+            await Task.Delay(20);
+        }
+
+        var response = rawData.Select(b => new Block(
             Height: (long)b.Number.Value,
-            Hash: b.BlockHash,
+            Hash: b.BlockHash.ToString(),
             TxAmount: b.TransactionCount(),
             GasUsed: b.GasUsed.Value.ToString(),
             GasLimit: b.GasLimit.Value.ToString(),
             Timestamp: DateTimeOffset
                 .FromUnixTimeSeconds((long)b.Timestamp.Value)
                 .UtcDateTime
-        )).ToList();
-        
+        ))
+        .ToList();
+
         _cache.Set(
-            cacheKey,
-            blocks,
+            BlockCache,
+            response,
             new MemoryCacheEntryOptions
             {
-                AbsoluteExpirationRelativeToNow = TimeSpan.FromSeconds(10),
-                SlidingExpiration = TimeSpan.FromSeconds(5),
+                AbsoluteExpirationRelativeToNow = TimeSpan.FromSeconds(50),
+                SlidingExpiration = TimeSpan.FromSeconds(35),
                 Priority = CacheItemPriority.High
             });
         
-        _logger.LogCritical("Getting data from request");
-        
-        return blocks;
+        return response
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .ToList();
     }
 
     public async Task<int> GetDaysAfterCreatingAsync()

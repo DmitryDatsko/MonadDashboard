@@ -15,7 +15,7 @@ public interface IRequests
     Task<IReadOnlyList<DailyTransactionCount>?> GetDailyTransactionCountAsync(int range);
     Task<HypersyncTransaction> HypersyncTransactionAsync(long start, long end);
     Task<IReadOnlyList<Transaction>> GetLatestBlockTransaction(int page, int pageSize = 20);
-    Task<IReadOnlyList<Block>> GetLatestBlockData();
+    Task<IReadOnlyList<Block>> GetLatestBlockData(int page, int pageSize = 20);
     Task<int> GetDaysAfterCreatingAsync();
     Task<long> GetBlockByTimestampAsync(DateTime? time);
 }

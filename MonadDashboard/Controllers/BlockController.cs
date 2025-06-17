@@ -15,10 +15,14 @@ public class BlockController : ControllerBase
     }
 
     [HttpGet("blocks")]
-    public async Task<IActionResult> GetBlocks()
+    public async Task<IActionResult> GetBlocks([FromQuery] int page, int pageSize = 20)
     {
-        var response = await _requests.GetLatestBlockData();
+        var response = await _requests.GetLatestBlockData(page, pageSize);
         
-        return Ok(response);
+        return Ok(new
+        {
+            response,
+            hasMore = response.Count == pageSize
+        });
     }
 }
