@@ -1,0 +1,41 @@
+services:
+  tx-counter:
+    build: ./HyperSync/
+    image: monad-dashboard-tx-counter
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+    ports:
+      - "8000:80"
+    networks:
+      - monad_dashboard_net
+  
+  backend:
+    image: monad-dashboard-backend
+    build: ./MonadDashboard/
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+    networks:
+      - proxy
+      - monad_dashboard_net
+
+  frontend:
+    image: monad-dashboard-frontend
+    ports:
+      - "3002:3000"
+    networks:
+      - proxy
+      - monad_dashboard_net
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+
+networks:
+  monad_dashboard_net:
+    driver: overlay
+  proxy:
+    external: true
